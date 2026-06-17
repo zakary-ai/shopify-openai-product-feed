@@ -1,0 +1,6 @@
+# Fill in OPENAI_SFTP_USERNAME and either let WinSCP prompt for the password
+# or save the site in WinSCP and replace the open line with: open "OpenAI Ads Feed"
+open sftp://OPENAI_SFTP_USERNAME@sftp.commerce.openai.com:443/ -hostkey=*
+cd /
+put ../../exports/openai-products.jsonl.gz openai-products.jsonl.gz
+exit

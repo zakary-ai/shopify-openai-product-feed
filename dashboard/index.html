@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OpenAI Ads Tracking Dashboard</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f7f8;
+        --panel: #ffffff;
+        --ink: #1e252b;
+        --muted: #66717c;
+        --line: #dfe4e8;
+        --accent: #157f72;
+        --accent-2: #3157a4;
+        --warn: #a66a00;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font: 14px/1.45 Arial, Helvetica, sans-serif;
+      }
+
+      header {
+        border-bottom: 1px solid var(--line);
+        background: var(--panel);
+      }
+
+      .wrap {
+        width: min(1180px, calc(100vw - 32px));
+        margin: 0 auto;
+      }
+
+      header .wrap {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 24px;
+        padding: 22px 0;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 22px;
+      }
+
+      .subtle {
+        color: var(--muted);
+      }
+
+      main {
+        padding: 24px 0 40px;
+      }
+
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 12px;
+        margin-bottom: 18px;
+      }
+
+      .metric,
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+
+      .metric {
+        padding: 16px;
+      }
+
+      .metric .label {
+        color: var(--muted);
+        font-size: 12px;
+        margin-bottom: 8px;
+      }
+
+      .metric .value {
+        font-size: 24px;
+        font-weight: 700;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+      }
+
+      .panel {
+        min-width: 0;
+        overflow: hidden;
+      }
+
+      .panel h2 {
+        margin: 0;
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--line);
+        font-size: 15px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      th,
+      td {
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      td.num,
+      th.num {
+        text-align: right;
+        white-space: nowrap;
+      }
+
+      .bar {
+        display: grid;
+        grid-template-columns: 150px 1fr 90px;
+        gap: 10px;
+        align-items: center;
+        padding: 9px 14px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .bar-track {
+        height: 9px;
+        background: #e7ecef;
+        border-radius: 999px;
+        overflow: hidden;
+      }
+
+      .bar-fill {
+        height: 100%;
+        background: var(--accent);
+      }
+
+      .empty {
+        padding: 24px 16px;
+        color: var(--warn);
+      }
+
+      @media (max-width: 900px) {
+        .metrics,
+        .grid {
+          grid-template-columns: 1fr;
+        }
+
+        header .wrap {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="wrap">
+        <div>
+          <h1>OpenAI Ads Tracking</h1>
+          <div class="subtle" id="generated"></div>
+        </div>
+        <div class="subtle" id="window"></div>
+      </div>
+    </header>
+
+    <main class="wrap">
+      <section class="metrics" id="metrics"></section>
+      <section class="grid">
+        <div class="panel">
+          <h2>Revenue By Day</h2>
+          <div id="by-day"></div>
+        </div>
+        <div class="panel">
+          <h2>Revenue By Campaign</h2>
+          <div id="by-campaign"></div>
+        </div>
+        <div class="panel">
+          <h2>Top Products</h2>
+          <div id="by-product"></div>
+        </div>
+        <div class="panel">
+          <h2>Top Categories</h2>
+          <div id="by-category"></div>
+        </div>
+        <div class="panel" style="grid-column: 1 / -1">
+          <h2>Recent OpenAI Orders</h2>
+          <div id="orders"></div>
+        </div>
+      </section>
+    </main>
+
+    <script src="dashboard-data.js"></script>
+    <script>
+      const data = window.OPENAI_DASHBOARD_DATA || {
+        generated_at: new Date().toISOString(),
+        window_days: 30,
+        utm_source: "openai",
+        currency: "USD",
+        totals: {
+          revenue: 0,
+          orders: 0,
+          items: 0,
+          average_order_value: 0,
+          roas: null,
+        },
+        by_day: [],
+        by_campaign: [],
+        by_product: [],
+        by_category: [],
+        recent_orders: [],
+      };
+      const money = (value) =>
+        new Intl.NumberFormat("en-US", { style: "currency", currency: data.currency || "USD" }).format(value || 0);
+      const num = (value) => new Intl.NumberFormat("en-US").format(value || 0);
+
+      document.getElementById("generated").textContent = `Generated ${new Date(data.generated_at).toLocaleString()}`;
+      document.getElementById("window").textContent = `Last ${data.window_days} days · utm_source=${data.utm_source}`;
+
+      const metrics = [
+        ["Revenue", money(data.totals.revenue)],
+        ["Orders", num(data.totals.orders)],
+        ["Items Sold", num(data.totals.items)],
+        ["AOV", money(data.totals.average_order_value)],
+        ["ROAS", data.totals.roas == null ? "Add spend" : `${data.totals.roas.toFixed(2)}x`],
+      ];
+
+      document.getElementById("metrics").innerHTML = metrics
+        .map(([label, value]) => `<div class="metric"><div class="label">${label}</div><div class="value">${value}</div></div>`)
+        .join("");
+
+      bars("by-day", data.by_day, "revenue");
+      bars("by-campaign", data.by_campaign, "revenue");
+      table("by-product", data.by_product, ["title", "category", "count", "revenue"]);
+      table("by-category", data.by_category, ["key", "count", "revenue"]);
+      ordersTable();
+
+      function bars(id, rows, metric) {
+        if (!rows.length) return empty(id);
+        const max = Math.max(...rows.map((row) => row[metric] || 0), 1);
+        document.getElementById(id).innerHTML = rows
+          .slice(0, 14)
+          .map(
+            (row) => `
+              <div class="bar">
+                <div title="${escapeHtml(row.key)}">${escapeHtml(row.key)}</div>
+                <div class="bar-track"><div class="bar-fill" style="width:${((row[metric] || 0) / max) * 100}%"></div></div>
+                <div class="num">${money(row[metric])}</div>
+              </div>`,
+          )
+          .join("");
+      }
+
+      function table(id, rows, columns) {
+        if (!rows.length) return empty(id);
+        document.getElementById(id).innerHTML = `
+          <table>
+            <thead><tr>${columns.map((column) => `<th class="${column === "count" || column === "revenue" ? "num" : ""}">${label(column)}</th>`).join("")}</tr></thead>
+            <tbody>
+              ${rows
+                .slice(0, 20)
+                .map(
+                  (row) => `<tr>${columns
+                    .map((column) => `<td class="${column === "count" || column === "revenue" ? "num" : ""}">${formatCell(column, row[column])}</td>`)
+                    .join("")}</tr>`,
+                )
+                .join("")}
+            </tbody>
+          </table>`;
+      }
+
+      function ordersTable() {
+        if (!data.recent_orders.length) return empty("orders");
+        document.getElementById("orders").innerHTML = `
+          <table>
+            <thead><tr><th>Order</th><th>Date</th><th>Campaign</th><th>Ad</th><th>Ad Group</th><th class="num">Revenue</th></tr></thead>
+            <tbody>
+              ${data.recent_orders
+                .map(
+                  (order) => `<tr>
+                    <td>${escapeHtml(order.name)}</td>
+                    <td>${new Date(order.created_at).toLocaleDateString()}</td>
+                    <td>${escapeHtml(order.utm.campaign || "")}</td>
+                    <td>${escapeHtml(order.utm.content || "")}</td>
+                    <td>${escapeHtml(order.utm.term || "")}</td>
+                    <td class="num">${money(order.revenue)}</td>
+                  </tr>`,
+                )
+                .join("")}
+            </tbody>
+          </table>`;
+      }
+
+      function empty(id) {
+        document.getElementById(id).innerHTML = `<div class="empty">No matching OpenAI orders found yet.</div>`;
+      }
+
+      function label(value) {
+        return value.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+      }
+
+      function formatCell(column, value) {
+        if (column === "revenue") return money(value);
+        if (column === "count") return num(value);
+        return escapeHtml(value || "");
+      }
+
+      function escapeHtml(value) {
+        return String(value).replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[char]);
+      }
+    </script>
+  </body>
+</html>

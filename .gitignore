@@ -1,0 +1,16 @@
+# Local secrets and generated outputs
+*.local.ps1
+*.local.sh
+.env
+.env.*
+!.env.example
+
+exports/
+dashboard/dashboard-data.js
+shopify-openai-product-feed-main/
+*.zip
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+node_modules/
