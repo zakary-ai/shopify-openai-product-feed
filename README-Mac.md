@@ -60,7 +60,14 @@ Export and preview:
 
 ```sh
 node scripts/openai-feed/export-shopify-openai-feed.mjs
-node scripts/openai-feed/preview-feed-copy.mjs exports/openai-products.jsonl.gz 30
+
+If you get throttling issuse:
+
+cp scripts/openai-feed/export-shopify-openai-feed.mjs scripts/openai-feed/export-shopify-openai-feed.mjs.bak
+
+sed -i '' 's/collections(first: 5)/collections(first: 1)/' scripts/openai-feed/export-shopify-openai-feed.mjs
+
+SHOPIFY_PAGE_SIZE=1 node scripts/openai-feed/export-shopify-openai-feed.mjs
 ```
 
 Upload `exports/openai-products.jsonl.gz` to OpenAI Ads Manager's SFTP feed connection.
